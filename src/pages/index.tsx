@@ -1,9 +1,46 @@
-import { useSession, signIn, signOut } from 'next-auth/react';
+import axios from 'axios';
+import type {
+  GetServerSidePropsContext,
+  InferGetServerSidePropsType,
+} from 'next';
+import { getCsrfToken, useSession } from 'next-auth/react';
 import Head from 'next/head';
-import { Button } from 'tailwind-joy/components';
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
+import { Button, Input } from 'tailwind-joy/components';
 
-export default function IndexPage() {
+export async function getServerSideProps(context: GetServerSidePropsContext) {
+  return {
+    props: {
+      csrfToken: await getCsrfToken(context),
+    },
+  };
+}
+
+type Inputs = {
+  username: string;
+  password: string;
+};
+
+export default function IndexPage({
+  csrfToken,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
   const { data: session } = useSession();
+  const { register, handleSubmit } = useForm<Inputs>();
+  const onSubmit: SubmitHandler<Inputs> = async ({ username, password }) => {
+    try {
+      const res = await axios.post('/api/auth/callback/credentials', {
+        csrfToken,
+        username,
+        password,
+      });
+      console.log(res);
+      window.location.reload();
+    }
+    catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
     <>
@@ -28,15 +65,45 @@ export default function IndexPage() {
       >
         <div>
           {session ? (
-            <>
+            <div>
               Signed in <br />
-              <Button onClick={() => signOut()}>Sign out</Button>
-            </>
+              <Button
+                onClick={async () => {
+                  try {
+                    const res = await axios.post('/api/auth/signout', {
+                      csrfToken,
+                    });
+                    console.log(res);
+                    window.location.reload();
+                  }
+                  catch (error) {
+                    console.error(error);
+                  }
+                }}
+              >
+                Sign out
+              </Button>
+            </div>
           ) : (
-            <>
-              Not signed in <br />
-              <Button onClick={() => signIn()}>Sign in</Button>
-            </>
+            <div className="space-y-4">
+              <form
+                className="space-y-4"
+                onSubmit={handleSubmit(onSubmit)}
+              >
+                <div className="flex items-center">
+                  <span className="w-10">ID</span>
+                  <Input {...register('username')} />
+                </div>
+                <div className="flex items-center">
+                  <span className="w-10">PW</span>
+                  <Input
+                    type="password"
+                    {...register('password')}
+                  />
+                </div>
+                <Button type="submit">Sign in</Button>
+              </form>
+            </div>
           )}
         </div>
       </div>
